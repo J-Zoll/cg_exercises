@@ -1,0 +1,10 @@
+/Users/jonas/Downloads/cg_exercise_01/01_colors/build/CMakeFiles/cg.dir
+/Users/jonas/Downloads/cg_exercise_01/01_colors/build/CMakeFiles/package.dir
+/Users/jonas/Downloads/cg_exercise_01/01_colors/build/CMakeFiles/package_source.dir
+/Users/jonas/Downloads/cg_exercise_01/01_colors/build/CMakeFiles/edit_cache.dir
+/Users/jonas/Downloads/cg_exercise_01/01_colors/build/CMakeFiles/rebuild_cache.dir
+/Users/jonas/Downloads/cg_exercise_01/cglib/build/cglib/CMakeFiles/cglib_cg_1.dir
+/Users/jonas/Downloads/cg_exercise_01/cglib/build/cglib/CMakeFiles/package.dir
+/Users/jonas/Downloads/cg_exercise_01/cglib/build/cglib/CMakeFiles/package_source.dir
+/Users/jonas/Downloads/cg_exercise_01/cglib/build/cglib/CMakeFiles/edit_cache.dir
+/Users/jonas/Downloads/cg_exercise_01/cglib/build/cglib/CMakeFiles/rebuild_cache.dir
