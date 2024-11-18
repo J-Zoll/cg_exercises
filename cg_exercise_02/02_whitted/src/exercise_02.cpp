@@ -60,6 +60,7 @@ bool intersect_sphere(
         // only t2 is in front of the ray
         *t = t2;
         return true;
+    }
 
     if (t2 < 0) {
         // only t1 is in front of the ray
@@ -102,27 +103,41 @@ glm::vec3 evaluate_phong(
 	{
 		// TODO: calculate the (normalized) direction to the light
 		const Light *light = light_uptr.get();
-		glm::vec3 L(0.0f, 1.0f, 0.0f);
+        glm::vec3 l = light->getPosition();
+		// glm::vec3 L(0.0f, 1.0f, 0.0f);
+        glm::vec3 L = glm::normalize(l - P);
 
 		float visibility = 1.f;
 		if (data.context.params.shadows) {
 			// TODO: check if light source is visible
+            visibility = visible(data, P, light->getPosition()) ? 1.f : 0.f;
 		}
+
+        float cos_theta = glm::dot(N, L);
+        float orthogonality = cos_theta > 0 ? 1.f : 0.f;
+        glm::vec3 emitted_light = (light->getEmission(-L) * visibility * orthogonality) / static_cast<float>(std::pow(glm::length(l - P), 2));
 
 		glm::vec3 diffuse(0.f);
 		if (data.context.params.diffuse) {
 			// TODO: compute diffuse component of phong model
+            diffuse = emitted_light * mat.k_d * std::max(0.f, cos_theta);
 		}
 
 		glm::vec3 specular(0.f);
 		if (data.context.params.specular) {
 			// TODO: compute specular component of phong model
-		}
+            glm::vec3 R_L = 2 * cos_theta * N - L;
+            float cos_psi = glm::dot(R_L, V);
+            specular = emitted_light * mat.k_s * std::pow(std::max(0.f, cos_psi), mat.n);
+        }
 
-		glm::vec3 ambient = data.context.params.ambient ? mat.k_a : glm::vec3(0.0f);
+		glm::vec3 ambient(0.f);
+        if (data.context.params.ambient) {
+            ambient = light->getPower() * mat.k_a / static_cast<float>(std::pow(glm::length(l - P), 2));
+        }
 
 		// TODO: modify this and implement the phong model as specified on the exercise sheet
-		contribution += ambient * light->getPower();
+		contribution += diffuse + specular + ambient;
 	}
 
 	return contribution;
