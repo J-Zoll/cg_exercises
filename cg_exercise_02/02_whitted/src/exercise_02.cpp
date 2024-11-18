@@ -27,7 +27,49 @@ bool intersect_sphere(
     cg_assert(t);
 	cg_assert(std::fabs(glm::length(ray_direction) - 1.f) < EPSILON);
 
-    return false;
+    float a = glm::dot(ray_direction, ray_direction);
+    float b = 2.f * glm::dot(ray_direction, ray_origin - center);
+    float c = glm::dot(ray_origin - center, ray_origin - center) - radius * radius;
+
+
+    float discriminant = b * b - 4 * a * c;
+
+    // negative discriminant => no intersection
+    if (discriminant < 0) {
+        return false;
+    }
+    
+    // discriminant equals 0 => one intersection
+    if (discriminant == 0) {
+        *t = -b / (2 * a);
+        return true;
+    }
+
+    // positive discriminant => two intersections
+    float t1 = (-b + sqrt(discriminant)) / (2 * a);
+    float t2 = (-b - sqrt(discriminant)) / (2 * a);
+
+
+    // check if the intersections are in front of the ray
+    if (t1 < 0 && t2 < 0) {
+        // both intersections are behind the ray
+        return false;
+    }
+    
+    if (t1 < 0) {
+        // only t2 is in front of the ray
+        *t = t2;
+        return true;
+
+    if (t2 < 0) {
+        // only t1 is in front of the ray
+        *t = t1;
+        return true;
+    }
+
+    // both intersections are in front of the ray => take the closer one
+    *t = std::min(t1, t2);
+    return true;
 }
 
 /*
