@@ -1,3 +1,6 @@
 .DS_Store
 build/
 cg
+assignment_diffs/
+assignment_images/
+imgui.ini

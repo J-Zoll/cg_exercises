@@ -208,7 +208,7 @@ glm::vec3 handle_transmissive_material(
 		glm::vec3 contribution(0.f);
         for (int i = 0; i < 3; i++) {
             float eta = eta_of_channel[i];
-            contribution += handle_transmissive_material_single_ior(data, depth, P, N, V, eta);
+            contribution[i] = handle_transmissive_material_single_ior(data, depth, P, N, V, eta)[i];
         }
         return contribution;
 	}
