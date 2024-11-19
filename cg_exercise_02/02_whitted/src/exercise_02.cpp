@@ -150,7 +150,10 @@ glm::vec3 evaluate_reflection(
 	glm::vec3 const& V)			// view vector (already normalized)
 {
 	// TODO: calculate reflective contribution by constructing and shooting a reflection ray.
-	return glm::vec3(0.f);
+	glm::vec3 R = reflect(V, N);
+    glm::vec3 o = P + data.context.params.ray_epsilon * R;
+    Ray reflection_ray(o, R);
+    return trace_recursive(data, reflection_ray, depth + 1);
 }
 
 glm::vec3 evaluate_transmission(
@@ -162,8 +165,14 @@ glm::vec3 evaluate_transmission(
 	float eta)					// the relative refraction index
 {
 	// TODO: calculate transmissive contribution by constructing and shooting a transmission ray.
-	glm::vec3 contribution(0.f);
-	return contribution;
+    glm::vec3 T(0.f);
+    bool transmission_possible = refract(V, N, eta, &T);
+    if (!transmission_possible) {
+        return glm::vec3(0.f);
+    }
+    glm::vec3 o = P + data.context.params.ray_epsilon * T;
+    Ray transmission_ray(o, T);
+    return trace_recursive(data, transmission_ray, depth + 1);
 }
 
 glm::vec3 handle_transmissive_material_single_ior(
@@ -175,8 +184,10 @@ glm::vec3 handle_transmissive_material_single_ior(
 	float eta)					// the relative refraction index
 {
 	if (data.context.params.fresnel) {
-		// TODO: replace with proper fresnel handling.
-		return evaluate_transmission(data, depth, P, N, V, eta);
+		float fresnel_factor = fresnel(V, N, eta);
+        glm::vec3 reflection = evaluate_reflection(data, depth, P, N, V);
+        glm::vec3 transmission = evaluate_transmission(data, depth, P, N, V, eta);
+        return fresnel_factor * reflection + (1 - fresnel_factor) * transmission;
 	}
 	else {
 		// just regular transmission
@@ -195,7 +206,11 @@ glm::vec3 handle_transmissive_material(
 	if (data.context.params.dispersion && !(eta_of_channel[0] == eta_of_channel[1] && eta_of_channel[0] == eta_of_channel[2])) {
 		// TODO: split ray into 3 rays (one for each color channel) and implement dispersion here
 		glm::vec3 contribution(0.f);
-		return contribution;
+        for (int i = 0; i < 3; i++) {
+            float eta = eta_of_channel[i];
+            contribution += handle_transmissive_material_single_ior(data, depth, P, N, V, eta);
+        }
+        return contribution;
 	}
 	else {
 		// dont handle transmission, take average refraction index instead.
