@@ -81,9 +81,8 @@ glm::vec3 SpotLight::getEmission(
 		) const
 {
 	cg_assert(std::fabs(glm::length(omega) - 1.f) < EPSILON);
- 
-	// TODO: implement a spotlight emitter as specified on the exercise sheet
-	return glm::vec3(0.f);
+    float cos_theta = glm::dot(omega, this->direction);
+	return this->getPower() * (this->falloff + 2) * std::pow(std::max(0.f, cos_theta), this->falloff);
 }
 
 glm::vec3 evaluate_phong(
