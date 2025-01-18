@@ -16,8 +16,15 @@ void
 main()
 {
 	// TODO: correctly set gl_Position, world_position, world_normal_interpolated, tex_coord
-	gl_Position = vec4(100.0, 100.0, 100.0, 1.0);
-	world_normal_interpolated = vec3(1.0);
-	world_position = vec3(0.0);
-	tex_coord = vec2(0.0);
+    // Set gl_Position using the MVP matrix
+    gl_Position = MVP * vec4(POSITION, 1.0);
+	
+    // Transform the position to world space using the model matrix
+    world_position = vec3(model_matrix * vec4(POSITION, 1.0));
+	
+    // Transform the normal to world space using the normal matrix
+	world_normal_interpolated = normalize(normal_matrix * NORMAL);
+	
+    // Pass the texture coordinates directly
+	tex_coord = TEXCOORD;
 }
