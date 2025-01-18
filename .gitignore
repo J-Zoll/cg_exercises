@@ -6,3 +6,5 @@ assignment_diffs
 assignment_images
 imgui.ini
 cglib
+cg_exercise_06/06_shaders/prefiltered_envmap_diffuse.png
+cg_exercise_06/06_shaders/prefiltered_envmap_specular.png
