@@ -1,0 +1,7 @@
+#include "glm/glm.hpp"
+
+int main (){
+  glm::mat4x4 aMatrix;
+  return 0;
+}
+// CG_REVISION 96a4891075b8226ae4d98732875b35e3ec5e7bed
