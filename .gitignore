@@ -1,6 +1,8 @@
 .DS_Store
-build
+.vscode
 cg
+build
 assignment_diffs
 assignment_images
 imgui.ini
+cglib

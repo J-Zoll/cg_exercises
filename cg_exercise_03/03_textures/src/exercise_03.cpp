@@ -14,6 +14,10 @@
 
 #include <algorithm>
 
+// my includes
+#include <cglib/rt/transform.h>
+#include <cglib/rt/intersection_tests.h>
+
 
 // -----------------------------------------------------------------------------
 
@@ -33,8 +37,8 @@ evaluate_nearest(int level, glm::vec2 const& uv) const
 	cg_assert(mip_levels[level]);
 
 	// TODO: compute the st-coordinates for the given uv-coordinates and mipmap level
-	int s = 0;
-	int t = 0;
+	int s = uv.x * mip_levels[level]->getWidth();
+    int t = uv.y * mip_levels[level]->getHeight();
 
 	// get the value of pixel (s, t) of miplevel level
 	return get_texel(level, s, t);
@@ -53,7 +57,13 @@ int ImageTexture::
 wrap_clamp(int val, int size)
 {
 	cg_assert(size > 0);
-	return 0;
+	if (val < 0) {
+        return 0;
+    } else if (val >= size) {
+        return size - 1;
+    } else {
+        return val;
+    }
 }
 
 /*
@@ -68,7 +78,16 @@ int ImageTexture::
 wrap_repeat(int val, int size)
 {
 	cg_assert(size > 0);
-	return 0;
+
+    if (val < 0) {
+        while (val < 0) {
+            val += size;
+        }
+    } else if (val >= size) {
+        val = val % size;
+    }
+
+    return val;
 }
 
 
@@ -91,8 +110,40 @@ evaluate_bilinear(int level, glm::vec2 const& uv) const
 {
 	cg_assert(level >= 0 && level < static_cast<int>(mip_levels.size()));
 	cg_assert(mip_levels[level]);
-	
-	return glm::vec4(0.f);
+
+    float s = uv.x * mip_levels[level]->getWidth();
+    float t = uv.y * mip_levels[level]->getHeight();
+
+    switch (wrap_mode) {
+        case TextureWrapMode::CLAMP:
+            s = wrap_clamp(s, mip_levels[level]->getWidth());
+            t = wrap_clamp(t, mip_levels[level]->getHeight());
+            break;
+        case TextureWrapMode::REPEAT:
+            s = wrap_repeat(s, mip_levels[level]->getWidth());
+            t = wrap_repeat(t, mip_levels[level]->getHeight());
+            break;
+        default:
+            break;
+    }
+
+    int s0 = std::floor(s);
+    int t0 = std::floor(t);
+    int s1 = std::ceil(s);
+    int t1 = std::ceil(t);
+
+    glm::vec4 c00 = get_texel(level, s0, t0);
+    glm::vec4 c01 = get_texel(level, s0, t1);
+    glm::vec4 c10 = get_texel(level, s1, t0);
+    glm::vec4 c11 = get_texel(level, s1, t1);
+
+    float ds = s - s0;
+    float dt = t - t0;
+
+    glm::vec4 c0 = c00 * (1 - ds) + c10 * ds;
+    glm::vec4 c1 = c01 * (1 - ds) + c11 * ds;
+
+    return c0 * (1 - dt) + c1 * dt;
 }
 
 // -----------------------------------------------------------------------------
@@ -123,6 +174,31 @@ create_mipmap()
 	cg_assert("must be power of two" && !(size_x & (size_x - 1)));
 	cg_assert("must be power of two" && !(size_y & (size_y - 1)));
 
+    while (size_x > 1 || size_y > 1) {
+        size_x = std::max(1, size_x / 2);
+        size_y = std::max(1, size_y / 2);
+
+        mip_levels.emplace_back(new Image(size_x, size_y));
+    }
+
+    for (int i = 1; i < mip_levels.size(); ++i) {
+        for (int x = 0; x < mip_levels[i]->getWidth(); ++x) {
+            for (int y = 0; y < mip_levels[i]->getHeight(); ++y) {
+                int x0 = 2 * x;
+                int y0 = 2 * y;
+                int x1 = std::min(2 * x + 1, mip_levels[i - 1]->getWidth() - 1);
+                int y1 = std::min(2 * y + 1, mip_levels[i - 1]->getHeight() - 1);
+
+                glm::vec4 c00 = get_texel(i - 1, x0, y0);
+                glm::vec4 c01 = get_texel(i - 1, x0, y1);
+                glm::vec4 c10 = get_texel(i - 1, x1, y0);
+                glm::vec4 c11 = get_texel(i - 1, x1, y1);
+
+                glm::vec4 c = (c00 + c01 + c10 + c11) / 4.0f;
+                set_texel(i, x, y, c);
+            }
+        }
+    }
 }
 
 /*
@@ -151,6 +227,10 @@ compute_uv_aabb_size(const Ray rays[4], Intersection const& isect)
 	for (int i = 0; i < 4; ++i) {
 		// todo: compute intersection positions using a ray->plane
 		// intersection
+        float* t = new float();
+        if (intersect_plane(rays[i].origin, rays[i].direction, isect.position, isect.normal, t)) {
+            intersection_positions[i] = rays[i].origin + rays[i].direction * (*t);
+        }
 	}
 
 	// compute uv coordinates from intersection positions
@@ -158,7 +238,15 @@ compute_uv_aabb_size(const Ray rays[4], Intersection const& isect)
 	get_intersection_uvs(intersection_positions, isect, intersection_uvs);
 
 	// TODO: compute dudv = length of sides of AABB in uv space
-	return glm::vec2(0.0);
+	glm::vec2 dudv = glm::vec2(0.0f);
+
+    for (int i = 0; i < 4; ++i) {
+        glm::vec2 duv = intersection_uvs[(i + 1) % 4] - intersection_uvs[i];
+        dudv.x = std::max(dudv.x, std::abs(duv.x));
+        dudv.y = std::max(dudv.y, std::abs(duv.y));
+    }
+
+    return dudv;
 }
 
 /*
@@ -179,7 +267,21 @@ compute_uv_aabb_size(const Ray rays[4], Intersection const& isect)
 glm::vec4 ImageTexture::
 evaluate_trilinear(glm::vec2 const& uv, glm::vec2 const& dudv) const
 {
-	return glm::vec4(0.f);
+    float s = uv.x * mip_levels[0]->getWidth();
+    float t = uv.y * mip_levels[0]->getHeight();
+
+    float T = std::max(dudv.x, dudv.y);
+    int i = std::floor(std::log2(T));
+    i = std::max(0, std::min(i, static_cast<int>(mip_levels.size()) - 2));
+
+    glm::vec4 c0 = evaluate_bilinear(i, glm::vec2(s, t));
+    glm::vec4 c1 = evaluate_bilinear(i + 1, glm::vec2(s, t));
+
+    float t0 = std::pow(2, i);
+    float t1 = std::pow(2, i + 1);
+    float alpha = (T - t0) / (t1 - t0);
+
+    return c0 * (1 - alpha) + c1 * alpha;
 }
 
 // -----------------------------------------------------------------------------
@@ -191,7 +293,9 @@ evaluate_trilinear(glm::vec2 const& uv, glm::vec2 const& dudv) const
  */
 glm::vec3 transform_direction(glm::mat4 const& transform, glm::vec3 const& d)
 {
-	return d;
+    glm::vec4 d_4d = glm::vec4(d, 0.0f);
+    glm::vec4 d_transformed = transform * d_4d;
+    return glm::normalize(glm::vec3(d_transformed));
 }
 
 /*
@@ -199,7 +303,9 @@ glm::vec3 transform_direction(glm::mat4 const& transform, glm::vec3 const& d)
  */
 glm::vec3 transform_position(glm::mat4 const& transform, glm::vec3 const& p)
 {
-	return p;
+	glm::vec4 p_4d = glm::vec4(p, 1.0f);
+    glm::vec4 p_transformed = transform * p_4d;
+    return glm::normalize(glm::vec3(p_transformed));
 }
 
 /*
@@ -223,6 +329,15 @@ intersect(Ray const& ray, Intersection* isect) const
 	if (RaytracingContext::get_active()->params.transform_objects) {
 		// TODO: transform ray, intersect object, transform intersection
 		// information back
+
+        Ray ray_t = transform_ray(ray, transform_world_to_object);
+        if (geo->intersect(ray_t, isect)) {
+            *isect = transform_intersection(*isect, transform_object_to_world, transform_object_to_world_normal);
+            isect->t = glm::length(ray.origin - isect->position);
+            return true;
+        } else {
+            return false;
+        }
 	}
 	return geo->intersect(ray, isect);
 }
@@ -253,7 +368,11 @@ glm::vec3 transform_direction_to_object_space(
 	cg_assert(std::fabs(glm::length(normal)    - 1.0f) < 1e-4f);
 	cg_assert(std::fabs(glm::length(tangent)   - 1.0f) < 1e-4f);
 	cg_assert(std::fabs(glm::length(bitangent) - 1.0f) < 1e-4f);
-	return d;
+
+    glm::mat3 TBN = glm::mat3(tangent, bitangent, normal);
+    glm::mat3 TBN_inv = glm::transpose(TBN);
+    glm::vec3 d_transformed = TBN_inv * d;
+    return glm::normalize(d_transformed);
 }
 
 // -----------------------------------------------------------------------------
