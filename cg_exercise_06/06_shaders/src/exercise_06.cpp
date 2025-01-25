@@ -138,27 +138,58 @@ prefilter_environment_diffuse(Image const &img)
 {
     const int width = img.getWidth();
     const int height = img.getHeight();
+    glm::ivec2 size(width, height); // Size of the image as glm::ivec2
     auto filtered = std::make_shared<Image>(width, height);
 
-    // For all texels in the envmap...
+    // For all texels in the environment map
     for (int y = 0; y < height; ++y)
     {
         for (int x = 0; x < width; ++x)
         {
-            // TODO: compute normal direction
+            // Compute normal direction for the current texel
+            glm::ivec2 coord(x, y);
+            glm::vec3 N = direction_from_lonlat_coord(coord, size);
 
-            // ... integrate over all incident directions.
+            glm::vec3 diffuseColor(0.0f); // Accumulate diffuse color
+            float weightSum = 0.0f;       // Accumulate weights
+
+            // Integrate over all incident directions
             for (int dy = 0; dy < height; ++dy)
             {
                 for (int dx = 0; dx < width; ++dx)
                 {
-                    // TODO: compute incident direction
-                    // TODO: accumulate samples
+                    // Compute incident direction
+                    glm::ivec2 sampleCoord(dx, dy);
+                    glm::vec3 wi = direction_from_lonlat_coord(sampleCoord, size);
+
+                    // Calculate solid angle
+                    float solidAngle = solid_angle_from_lonlat_coord(sampleCoord, size);
+
+                    // Lambertian diffuse term (N · ωi)
+                    float cosTheta = glm::dot(N, wi);
+                    if (cosTheta > 0.0f) // Only consider contributions where cosTheta > 0
+                    {
+                        // Get the radiance value from the environment map
+                        glm::vec3 radiance = img.getPixel(dx, dy);
+
+                        // Accumulate weighted radiance
+                        diffuseColor += radiance * cosTheta * solidAngle;
+                        weightSum += cosTheta * solidAngle;
+                    }
                 }
             }
 
-            // TODO: write filtered value
-            // filtered->setPixel(...);
+            // Normalize the accumulated value
+            if (weightSum > 0.0f)
+            {
+                diffuseColor /= weightSum;
+            }
+
+            // Extend diffuseColor (RGB) to RGBA by adding alpha = 1.0
+            glm::vec4 filteredPixel(diffuseColor, 1.0f);
+
+            // Write the filtered value into the prefiltered map
+            filtered->setPixel(x, y, filteredPixel);
         }
     }
 
@@ -175,6 +206,7 @@ prefilter_environment_specular(Image const &img, float n)
 {
     const int width = img.getWidth();
     const int height = img.getHeight();
+    glm::ivec2 size(width, height); // Size of the image as glm::ivec2
 
     auto filtered = std::make_shared<Image>(width, height);
 
@@ -183,24 +215,56 @@ prefilter_environment_specular(Image const &img, float n)
     {
         for (int x = 0; x < width; ++x)
         {
-            // TODO: compute reflection direction
+            // Compute reflection direction for the current texel
+            glm::ivec2 coord(x, y);
+            glm::vec3 R = direction_from_lonlat_coord(coord, size);
+
+            glm::vec3 specularColor(0.0f); // Accumulate specular color
+            float weightSum = 0.0f;        // Accumulate weights
 
             // ... integrate over all incident directions.
             for (int dy = 0; dy < height; ++dy)
             {
                 for (int dx = 0; dx < width; ++dx)
                 {
-                    // TODO: compute incident direction
+                    // Compute incident direction
+                    glm::ivec2 sampleCoord(dx, dy);
+                    glm::vec3 wi = direction_from_lonlat_coord(sampleCoord, size);
 
-                    // TODO: accumulate samples
+                    // Calculate solid angle
+                    float solidAngle = solid_angle_from_lonlat_coord(sampleCoord, size);
+
+                    // Compute the Phong BRDF term (R · ωi)^n
+                    float cosAlpha = glm::dot(R, wi);
+                    if (cosAlpha > 0.0f) // Only consider contributions where cosAlpha > 0
+                    {
+                        float phongWeight = std::pow(cosAlpha, n);
+
+                        // Get the radiance value from the environment map
+                        glm::vec3 radiance = img.getPixel(dx, dy);
+
+                        // Accumulate weighted radiance
+                        specularColor += radiance * phongWeight * solidAngle;
+                        weightSum += phongWeight * solidAngle;
+                    }
                 }
             }
 
-            // TODO: write filtered value
-            // filtered->setPixel(...);
+            // Normalize the accumulated value
+            if (weightSum > 0.0f)
+            {
+                specularColor /= weightSum;
+            }
+
+            // Extend specularColor (RGB) to RGBA by adding alpha = 1.0
+            glm::vec4 filteredPixel(specularColor, 1.0f);
+
+            // Write the filtered value into the prefiltered map
+            filtered->setPixel(x, y, filteredPixel);
         }
     }
 
     return filtered;
 }
+
 // CG_REVISION d4ab32bd208749f2d2b1439e25d16e642b039298
